@@ -1,0 +1,3 @@
+#!/bin/bash
+
+parse-dashboard --appId iT8NyJO0dChjLyfVsHUTM8UZQLSBBJLxd43AX9IY --masterKey 8p24267AaIIe4xUAH3DM0tCuiTv2pko2rreHBfHc --serverURL "http://localhost:1337/parse" --appName cognistudy
