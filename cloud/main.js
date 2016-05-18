@@ -1,0 +1,44 @@
+var m1 = require('./deleteStudent.js');
+var m2 = require('./doesEmailExist.js');
+var m3 = require('./userCount.js');
+var m4 = require('./deleteChallenge.js');
+var m5 = require('./testPush.js');
+var m6 = require('./deletePinnedObjects.js');
+var m7 = require('./changeUserId.js');
+var m8 = require('./deleteStudentV2.js');
+var m9 = require('./incrementCatAndSubStats.js'); //deprecated
+//var m10 = require('./deleteOldBlockStats.js');
+var m11 = require('./questionCount.js');
+var m12 = require('./chooseRandomQuestionsV2.js');
+var m13 = require('./deleteTestQuestions.js');
+var m14 = require('./studentRequestToTutor');
+var m15 = require('./removeStudent');
+var m16 = require('./addStudent');
+var m17 = require('./deleteAllObjectsFromClasses');
+var m18 = require('./sendMessageNotification.js');
+var m19 = require('./deleteAnalytics.js');
+var m20 = require('./sendYourTurnNotification.js');
+var m21 = require('./getRandomOpponent.js');
+var m22 = require('./sendTutorRequestNotification.js');
+var m23 = require('./Response.js');
+var m24 = require('./QuestionReport.js');
+var m25 = require('./analyticsAfterSaves.js');
+var m26 = require('./PublicUserData.js');
+
+var l1 = require('./getAllSubStats.js');
+var l2 = require('./getSubStats.js');
+var l3 = require('./getSomeCatStats.js');
+var l4 = require('./tutorRequestToStudent.js');
+var l5 = require('./addTutor.js');
+var l6 = require('./removeTutor.js');
+var l7 = require('./chooseTenQuestions.js');
+var l8 = require('./getStudentAllTimeAnswered.js');
+var l9 = require('./queryAllQuestions.js');
+var l10 = require('./oldestPendingQuestion.js');
+var l11 = require('./tutorAlreadyRequestedStudent.js');
+var l12 = require('./questionsByTutor.js');
+var l13 = require('./assignedQuestionsToStudent.js');
+var l14 = require('./oldestReportedQuestion.js');
+
+var a1 = require('./assignQuestion.js');
+
