@@ -1,79 +1,129 @@
-var common = require('./common.js');
+var common = require('./cloud/common.js');
 
-Parse.Cloud.define("chooseThreeQuestions", function(request, response) {
+Parse.Cloud.define("chooseRandomQuestions", function(request, response) {
 
 	var challengeUserDataId = request.params.challengeUserDataId;
 	var challengeId = request.params.challengeId;
-	var categories = request.params.categories;
+	var category = request.params.category;
+	var skipBundles = request.params.skipBundles;
+
+	var questionKeys = ["questionContents", "subject", "category", "inBundle", "numberInBundle"];
+	var questionContentsKeys = ["questionText", "image", "author", "answers", "correctAnswer", "explanation"];
+	var bundleKeys = ["bundle", "passageText", "image"];
 
 	var query = new Parse.Query("ChallengeUserData")
-	.include("publicUserData.student.studentCategoryRollingStats.answeredQuestionIds")
+						.include("publicUserData.student.studentCategoryRollingStats")
 
 	query.get(challengeUserDataId, {
 		success: function(challengeUserData) {
 			var student = challengeUserData.get("publicUserData").get("student");
+			var baseUserId = student.get("baseUserId");
+			isRequestValid(challengeId, baseUserId).then(
+				function(isValid) {
+					if(!isValid) {
+						response.error("Not a valid request");
+					}
 
-			console.log("Before validity check");
-			getAnsweredQuestionIdsIfValid(student, challengeId, categories).then(
-				function(answeredQuestionIds) {
+					var rollingStatsList = student.get("studentCategoryRollingStats");
+					var rollingStatsToFetch;
+					for(var i=0; i<rollingStatsList.length; i++) {
+						var rollingStats = rollingStatsList[i];
+						var cat = rollingStats.get("category");
+						if(cat == category) {
+							rollingStatsToFetch = rollingStatsList[i];
+							break;
+						}
+					}
+					rollingStatsToFetch.fetch({
+						useMasterKey: true,
+						success: function(fetchedRollingStats) {
 
-					console.log("Got to answeredQuestionIds");
-					printAnsweredQuestionIds(answeredQuestionIds);
-					getRandomQuestion(categories, answeredQuestionIds, false).then(
-						function(firstQuestion) {
-							questionToString(firstQuestion, 1);
-							// response.success("Intermediate finish");
-							if(firstQuestion.get("inBundle")) {
-								var bundle = firstQuestion.get("bundle");
-								console.log("Bundle id = " + bundle.id);
-								bundle.fetch({
-									success: function(bundle) {
-										var unfetchedQuestions = bundle.get("questions");
-										console.log("Size of bundle questions = " + unfetchedQuestions.length);
-										Parse.Object.fetchAllIfNeeded(unfetchedQuestions, {
-											success: function(questions) {
-												for(var i=0; i<questions.length; i++) {
-													questionToString(questions[i], i);
-												}
-												if(questions.length < 3) {
-													response.error("Error: bundle did not contain 3 questions"); //TODO: Just grab another question here
-												}
-												challengeUserData.set("curTurnQuestions", questions);
-												response.success(questions);
-											}, error: function(error) { response.error(error); }
-										});
-									}, error: function(error) { response.error(error); }
-								});
-							}
-							else {
-								answeredQuestionIds.push(firstQuestion.id);
-								printAnsweredQuestionIds(answeredQuestionIds);
-								getRandomQuestion(categories, answeredQuestionIds, true).then(
-									function(secondQuestion) {
-										questionToString(secondQuestion, 2);
-										answeredQuestionIds.push(secondQuestion.id);
-										printAnsweredQuestionIds(answeredQuestionIds);
-										getRandomQuestion(categories, answeredQuestionIds, true).then(
-											function(thirdQuestion) {
-												questionToString(thirdQuestion, 3);
-												var questions = [];
-												questions.push(firstQuestion);
-												questions.push(secondQuestion);
-												questions.push(thirdQuestion);
-												challengeUserData.set("curTurnQuestions", questions);
-												response.success(questions);
-											}, function(error) { response.error(error);
-											});
-									}, function(error) { response.error(error);
+							var ansQuestionsToFetch = fetchedRollingStats.get("answeredQuestionIds");
+							ansQuestionsToFetch.fetch({
+								useMasterKey: true,
+								success: function(fetchedAnsQuesIds) {
+									getRandomQuestion(category, fetchedAnsQuesIds, [], skipBundles).then(
+										function(firstQuestion) {
+											questionToString(firstQuestion, 1);
+
+											// response.success("Intermediate finish");
+											if(firstQuestion.get("inBundle")) {
+												var bundle = firstQuestion.get("bundle");
+												console.log("Bundle id = " + bundle.id);
+												bundle.fetch({
+													success: function(bundle) {
+														var questions = bundle.get("questions");
+														console.log("Size of bundle questions = " + questions.length);
+														var ids = [];
+														for(var i=0; i<questions.length; i++) {
+															questionToString(questions[i], i);
+															ids.push(questions[i].id);
+														}
+														if(questions.length < 3) {
+															response.error("Error: bundle did not contain 3 questions"); //TODO: Just grab another question here
+														}
+														var query = new Parse.Query("Question")
+																			.containedIn("objectId", ids)
+																			.select(questionKeys)  //The selects don't appear to be working
+																			.include("questionContents")
+																			.select(questionContentsKeys)
+																			.include("bundle")
+																			.ascending("numberInBundle")
+																			.select(bundleKeys);
+														query.find({
+															useMasterKey: true,
+															success: function(results) {
+																challengeUserData.set("curTurnQuestions", results);
+																challengeUserData.save();
+																response.success(results);
+															}, error: function(error) { response.error(error); } //Error fetching questions
+														});
+													}, error: function(error) { response.error(error); }
+												});
+											}
+											else {
+												var additionalQuestionIds = [];
+												additionalQuestionIds.push(firstQuestion.id);
+												// printAnsweredQuestionIds();
+												getRandomQuestion(category, fetchedAnsQuesIds, additionalQuestionIds, true).then(
+													function(secondQuestion) {
+														questionToString(secondQuestion, 2);
+														additionalQuestionIds.push(secondQuestion.id);
+														// printAnsweredQuestionIds();
+														getRandomQuestion(category, fetchedAnsQuesIds, additionalQuestionIds, true).then(
+															function(thirdQuestion) {
+																questionToString(thirdQuestion, 3);
+																var ids = [];
+																ids.push(firstQuestion.id);
+																ids.push(secondQuestion.id);
+																ids.push(thirdQuestion.id);
+																var query = new Parse.Query("Question")
+																					.containedIn("objectId", ids)
+																					.select(questionKeys)
+																					.include("questionContents")
+																					.select(questionContentsKeys);
+																query.find({
+																	success: function(results) {
+																		challengeUserData.set("curTurnQuestions", results);
+																		challengeUserData.save();
+																		response.success(results);
+																	}, error: function(error) { response.error(error); } //Error fetching questions
+																});
+															}, function(error) { response.error(error); //Error getting third question
+														});
+													}, function(error) { response.error(error); //Error getting second question
+												});
+											}
+										}, function(error) { console.log("Error getting first question"); response.error(error); //Error getting first question
 									});
-							}
-						}, function(error) { response.error(error);
-						});
-				// }, function(error) { response.error(error);
-				}, function(error) { console.log("Error in validity check"); response.error(error);
+								}, error: function(error) { console.log("Error fetching AnsweredQuestionIds"); response.error(error); } 
+							});
+						}, error: function(error) { console.log("Error fetching rolling stats"); response.error(error); } //Error fetching rolling stats
+					});
+				}, function(error) { console.log("Request not valid"); response.error(error); //Request not valid
 			});
-}, error: function(error) { }
-});
+		}, error: function(error) { console.log("Error getting ChallengeUserData"); response.error(error); } //Error getting ChallengeUserData 
+	});
 });
 
 function questionToString(question, num) {
@@ -93,118 +143,98 @@ function printAnsweredQuestionIds(answeredQuestionIds) {
 	console.log(s);
 }
 
-function getRandomQuestion(categories, answeredQuestionIds, skipBundles) {
+function getRandomQuestion(category, fetchedAnsQuesIds, additionalQuestionIds, skipBundles) {
 
 	var promise = new Parse.Promise();
 
-	var countQuery = new Parse.Query("CategoryStats")
-	.containedIn("category", categories);
+	var singleQuestionIds = fetchedAnsQuesIds.get("singleQuestionIds");
+	var bundleQuestionIds = fetchedAnsQuesIds.get("bundleQuestionIds");
+	if(singleQuestionIds == undefined)
+		singleQuestionIds = [];
+	if(bundleQuestionIds == undefined)
+		bundleQuestionIds = [];
+	console.log("Printing bundleQuestionIds");
+	printAnsweredQuestionIds(bundleQuestionIds);
+	console.log("Printing singleQuestionIds");
+	printAnsweredQuestionIds(singleQuestionIds);
 
-	countQuery.find({ useMasterKey: true,
-		success: function(counts) {
+	var allQuestionIds = singleQuestionIds.slice();
+	allQuestionIds = allQuestionIds.concat(additionalQuestionIds);
+	if(!skipBundles)
+		allQuestionIds = allQuestionIds.concat(bundleQuestionIds);
+	printAnsweredQuestionIds(allQuestionIds);
 
-			var numRemaining;
+	var quesQuery = new Parse.Query("Question")
+	.equalTo("category", category);
 
-			Parse.Object.fetchAll(counts).then(
+	if(skipBundles) {
+		quesQuery.equalTo("inBundle", false);
+	}
 
-				function(counts) {
-					var numAnswered = answeredQuestionIds.length;
-					var total = 0;
-					for(var i=0; i<counts.length; i++) {
-						countObject = counts[i];
-						console.log(countObject.get("category") + " numActive " + countObject.get("numActive"));
-						if(!skipBundles)
-							total += countObject.get("numActive");
-						else
-							total += countObject.get("numActiveNotInBundle");
+	quesQuery.count({ useMasterKey: true,
+		success: function(total) {
+
+			console.log("Total = " + total);
+			var numAnswered = allQuestionIds.length;
+			var numRemaining = total - numAnswered;
+			console.log("numRemaining = " + numRemaining);
+
+			var reset = false;
+			if(!skipBundles && numRemaining < 3) {
+				console.log("Resetting singles and bundles");
+				fetchedAnsQuesIds.set("singleQuestionIds", []);
+				fetchedAnsQuesIds.set("bundleQuestionIds", []);
+				reset = true;
+			}
+			else if(skipBundles && numRemaining < 1) { 
+				console.log("Resetting singles only");
+				fetchedAnsQuesIds.set("singleQuestionIds", []);
+				reset = true;
+			}
+			if(reset) {
+				fetchedAnsQuesIds.save({
+					useMasterKey: true,
+					success: function(obj) {
+						//Try again now that the answeredQuestionIds have been reset
+						getRandomQuestion(category, obj, additionalQuestionIds, skipBundles).then(
+							function(question) {
+								promise.resolve(question);
+							}, function(error) {
+								promise.reject("Error getting question after reset");
+						}); 
+					}, error: function(error) {
+						promise.reject("Error resetting answeredQuestionIds and saving object");
 					}
-					console.log("Total = " + total);
-					numRemaining = total - numAnswered;
-					console.log("numRemaining = " + numRemaining);
+				});
+			}
+			else {
+				var skipNum = Math.max(0, Math.floor(Math.random()*numRemaining));
 
-					var skipNum = Math.max(0, Math.floor(Math.random()*numRemaining));
+				console.log("skipNum = " + skipNum);
 
-					console.log("skipNum = " + skipNum);
+				var query = new Parse.Query("Question")
+				.equalTo("isActive", true)
+				.equalTo("test", false)
+				.equalTo("category", category)
+				.notContainedIn("objectId", allQuestionIds)
+				.skip(skipNum)
+				.limit(1);
 
-					var query = new Parse.Query("Question")
-							.equalTo("isActive", true)
-							.equalTo("test", true) ////////////////////////////////////TODO: Remove later
-							.containedIn("category", categories)
-							.notContainedIn("objectId", answeredQuestionIds)
-							.skip(skipNum)
-							.limit(1)
-							.include("bundle")
-							.include("questionContents");
+				if(skipBundles) {
+					query = query.equalTo("inBundle", false);
+				}
 
-							if(skipBundles) {
-								query = query.equalTo("inBundle", false);
-							}
-
-							query.first({
-								success: function(result) {
-									// console.log("In getRandomQuestion: questionId = " + result.id);
-									promise.resolve(result);
-								}, error: function(error) { promise.reject("Error getting random question"); }
-							});
-				}, function(error) { promise.reject(error); }
-			);
-		}, error: function(error) { promise.reject("Error getting QuestionCount"); }
+				query.first({
+					useMasterKey: true,
+					success: function(result) {
+						// console.log("In getRandomQuestion: questionId = " + result.id);
+						promise.resolve(result);
+					}, error: function(error) { promise.reject("Error getting random question"); }
+				});
+			}
+		}, error: function(error) { promise.reject("Error finding applicable Questions"); }
 	});
 	return promise;
-}
-
-function getAnsweredQuestionIdsIfValid(student, challengeId, categories) {
-
-	Parse.Cloud.useMasterKey();
-
-	console.log("Inside getAQIIV");
-	var baseUserId = student.get("baseUserId");
-	var promise = new Parse.Promise();
-	isRequestValid(challengeId, baseUserId).then(
-		function(isValid) {
-			if(!isValid) {
-				console.log("getAQIIV: Invalid request");
-				promise.reject("Not a valid request");
-				return;
-			}
-			var rollingStatsList = student.get("studentCategoryRollingStats");
-			var rollingStatsToFetch = [];
-			for(var i=0; i<rollingStatsList.length; i++) {
-				var rollingStats = rollingStatsList[i];
-				var cat = rollingStats.get("category");
-				for(var j=0; j<categories.length; j++) {
-					if(categories[j] == cat) {
-						rollingStatsToFetch.push(rollingStats);
-						break;
-					}
-				}
-			}
-			Parse.Object.fetchAll(rollingStatsToFetch, {
-				success: function(fetchedRollingStats) {
-					var ansQuestionsToFetch = [];
-					for(var i=0; i<fetchedRollingStats.length; i++) {
-						var rollingStats = fetchedRollingStats[i];
-						var ansQuestionIdsObject = rollingStats.get("answeredQuestionIds");
-						ansQuestionsToFetch.push(ansQuestionIdsObject);
-					}
-					Parse.Object.fetchAll(ansQuestionsToFetch, {
-						success: function(fetchedAnsQuesIds) {
-							var list = [];
-							for(var i=0; i<fetchedAnsQuesIds.length; i++) {
-								var ansQuestionIdsObject = fetchedAnsQuesIds[i];
-								var questionIds = ansQuestionIdsObject.get("questionIds");
-								console.log("Size of questionIds = " + questionIds.length);
-								list.push.apply(list, questionIds);
-							}
-							console.log("list size = " + list.length);
-							promise.resolve(list);
-						}, error: function(error) { promise.reject(error); }
-					});
-				}, error: function(error) { promise.reject(error); }
-			});
-		}, function(error) { promise.reject(error);
-		});
-return promise;
 }
 
 function isRequestValid(challengeId, baseUserId) {

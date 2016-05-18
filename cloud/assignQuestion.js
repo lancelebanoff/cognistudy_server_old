@@ -1,21 +1,23 @@
-var common = require("./common.js");
+//changed, Logan should test
+var common = require("./cloud/common.js");
 
 Parse.Cloud.define("assignQuestion", function(request, response) {
 	
-	Parse.Cloud.useMasterKey();
-
 	var baseUserId = request.params.baseUserId;
 	var suggestedQuestionId = request.params.suggestedQuestionId;
 
 	var suggestedQuestionQuery = new Parse.Query("SuggestedQuestion");
 	suggestedQuestionQuery.get(suggestedQuestionId, {
+		useMasterKey: true,
 		success: function(suggestedQuestion) {
 			var privateStudentDataQuery = new Parse.Query("PrivateStudentData");
 			privateStudentDataQuery.equalTo("baseUserId", baseUserId)
 			.first({
+				useMasterKey: true,
 				success: function(privateStudentData) {
 					privateStudentData.relation("assignedQuestions").add(suggestedQuestion);
 					privateStudentData.save({
+						useMasterKey: true,
 						success: function(saved) {
 							var data = createNotificationData();
 							common.sendPushNotification(baseUserId, data).then(

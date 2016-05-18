@@ -1,0 +1,7 @@
+#!/bin/bash
+
+curl -X POST \
+-H "X-Parse-Application-Id: iT8NyJO0dChjLyfVsHUTM8UZQLSBBJLxd43AX9IY" \
+-H "Content-Type: application/json" \
+-d '{"baseUserId":"'$1'"}' \
+http://localhost:1337/parse/functions/deleteStudentV2

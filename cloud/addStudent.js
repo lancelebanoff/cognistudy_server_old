@@ -1,8 +1,8 @@
-var common = require('./common.js');
+//changed, Logan should test
+var common = require('./cloud/common.js');
 
 Parse.Cloud.define("addStudent", function(request, response) {
 
-	Parse.Cloud.useMasterKey();
 	var tutorPublicDataId = request.params.tutorPublicDataId;
 	var studentPublicDataId = request.params.studentPublicDataId;
 	var query = new Parse.Query("PublicUserData");
@@ -23,7 +23,7 @@ Parse.Cloud.define("addStudent", function(request, response) {
 							privateTutorData.addUnique("students", studentPublicData);
 
 						  	// Notification to tutor
-						  	var NotificationTutor = Parse.Object.extend("NotificationTutor");
+						  var NotificationTutor = Parse.Object.extend("NotificationTutor");
 							var notificationTutor = new NotificationTutor();
 							notificationTutor.set("tutorFor", publicTutorData);
 							notificationTutor.set("userFrom", studentPublicData);
@@ -31,6 +31,7 @@ Parse.Cloud.define("addStudent", function(request, response) {
 							notificationTutor.set("firstSeenAt", null);
 
 							notificationTutor.save(null, {
+								useMasterKey: true,
 							  success: function(notificationTutor) {
 
 							  	// Add to tutor's notication relation
@@ -38,6 +39,7 @@ Parse.Cloud.define("addStudent", function(request, response) {
 								notificationsRelation.add(notificationTutor);
 
 								privateTutorData.save(null, {
+									useMasterKey: true,
 								  success: function(privateTutorData) {
 								    // Execute any logic that should take place after the object is saved.
 								    console.log('Student added to students in PrivateTutorData with objectId: ' + privateTutorData.id);

@@ -1,12 +1,13 @@
-var common = require('./common.js');
+//changed
+var common = require('./cloud/common.js');
 
 Parse.Cloud.define("addTutor", function(request, response) {
 
-	Parse.Cloud.useMasterKey();
 	var privateStudentDataId = request.params.privateStudentDataId;
 	var tutorPublicDataId = request.params.tutorPublicDataId;
 	var query = new Parse.Query("PrivateStudentData");
 	query.get(privateStudentDataId, {
+		useMasterKey: true,
 	  success: function(privateStudentData) {
 	    // The object was retrieved successfully.
 		var tutorQuery = new Parse.Query("PublicUserData");
@@ -17,6 +18,7 @@ Parse.Cloud.define("addTutor", function(request, response) {
 			privateStudentData.remove("requestsToTutors", tutorPublicData);
 
 			privateStudentData.save(null, {
+				useMasterKey: true,
 			  success: function(privateStudentData) {
 			    // Execute any logic that should take place after the object is saved.
 			  	var successStr = 'Tutor added to tutors in PrivateStudentData with objectId: ' + tutorPublicData.id;
@@ -58,8 +60,6 @@ Parse.Cloud.define("addTutor", function(request, response) {
 });
 
 function sendTutorAcceptNotification(senderBaseUserId, receiverBaseUserId) {
-
-	Parse.Cloud.useMasterKey();
 
 	var promise = new Parse.Promise();
 	var query = new Parse.Query("PublicUserData")

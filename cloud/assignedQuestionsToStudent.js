@@ -1,8 +1,8 @@
-var common = require('./common.js');
+//changed, Logan should test
+var common = require('./cloud/common.js');
 
 Parse.Cloud.define("assignedQuestionsToStudent", function(request, response) {
 
-	Parse.Cloud.useMasterKey();
 	var studentPublicDataId = request.params.studentPublicDataId;
 	var tutorPublicDataId = request.params.tutorPublicDataId;
 
@@ -13,6 +13,7 @@ Parse.Cloud.define("assignedQuestionsToStudent", function(request, response) {
 	var query = new Parse.Query("PublicUserData")
 		.include("student.privateStudentData");
 	query.get(studentPublicDataId, {
+		useMasterKey: true,
 	  success: function(studentPublicData) {
   		var privateStudentData = studentPublicData.get("student").get("privateStudentData");
   		var allAssignedQuestionsRelation = privateStudentData.get("assignedQuestions");
@@ -22,6 +23,7 @@ Parse.Cloud.define("assignedQuestionsToStudent", function(request, response) {
 		query.equalTo("tutor", tutorPublicDataObject).descending("createdAt").include("question")
 		.include("question.questionContents").include("question.questionData").include("response");
 		query.find({
+			useMasterKey: true,
 		  success: function(assignedQuestions) {
 		  	response.success(assignedQuestions);
 		  },
